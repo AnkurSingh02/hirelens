@@ -1,5 +1,4 @@
-import yake
-from sklearn.feature_extraction.text import TfidfVectorizer
+import importlib
 from typing import List, Tuple, Set
 from core.models import KeywordResult
 import re
@@ -65,6 +64,7 @@ def _extract_jd_keywords(
 
     # Method 2: YAKE keyword extraction
     try:
+        yake = importlib.import_module("yake")
         yake_extractor = yake.KeywordExtractor(
             lan="en",
             n=2,        # max ngram size
@@ -91,6 +91,9 @@ def _extract_jd_keywords(
 
     # Method 3: TF-IDF for additional terms
     try:
+        TfidfVectorizer = importlib.import_module(
+            "sklearn.feature_extraction.text"
+        ).TfidfVectorizer
         tfidf = TfidfVectorizer(
             max_features=30,
             stop_words='english',

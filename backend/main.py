@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
+from fastapi import FastAPI, Request  # type: ignore[import-not-found]
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
+from fastapi.responses import JSONResponse  # type: ignore[import-not-found]
+from slowapi import _rate_limit_exceeded_handler  # type: ignore[import-not-found]
+from slowapi.errors import RateLimitExceeded  # type: ignore[import-not-found]
 
 from core.config import settings
 from routers.analyze import router as analyze_router
@@ -71,10 +71,20 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
+    import subprocess
+    import sys
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+            "--reload",
+        ],
+        check=True,
     )

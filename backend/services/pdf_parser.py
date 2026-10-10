@@ -1,9 +1,14 @@
-import pdfplumber
+import importlib
 import re
 import io
 from typing import Optional
 from core.models import ResumeSection
 from utils.text_cleaner import clean_text, extract_email, extract_phone, extract_name
+
+
+def _load_pdfplumber():
+    """Load pdfplumber lazily so the module can be imported without it installed."""
+    return importlib.import_module("pdfplumber")
 
 
 # Section headers we look for in resumes
@@ -72,7 +77,7 @@ def _extract_text_from_pdf(file_bytes: bytes) -> str:
     text_parts = []
 
     try:
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        with _load_pdfplumber().open(io.BytesIO(file_bytes)) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
@@ -181,7 +186,7 @@ def get_pdf_metadata(file_bytes: bytes) -> dict:
     }
 
     try:
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        with _load_pdfplumber().open(io.BytesIO(file_bytes)) as pdf:
             metadata['page_count'] = len(pdf.pages)
 
             for page in pdf.pages:

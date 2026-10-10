@@ -2,7 +2,7 @@ from datetime import time
 import json
 import re
 from typing import Dict, List, Optional
-from groq import Groq, RateLimitError
+from groq import Groq, RateLimitError  # type: ignore[import-not-found]
 from core.config import settings
 from core.models import (
     CategoryScores, CategoryScore,

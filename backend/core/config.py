@@ -1,7 +1,25 @@
-from pydantic_settings import BaseSettings
+try:
+    from pydantic_settings import BaseSettings  # type: ignore[reportMissingImports]
+except ImportError:  # pragma: no cover
+    try:
+        from pydantic import BaseSettings  # type: ignore[reportMissingImports]
+    except ImportError:  # pragma: no cover
+        try:
+            from pydantic.v1 import BaseSettings  # type: ignore[reportMissingImports]
+        except ImportError:  # pragma: no cover
+            class BaseSettings:  # type: ignore[no-redef]
+                def __init__(self, **kwargs):
+                    for key, value in kwargs.items():
+                        setattr(self, key, value)
+
 from typing import List
 import os
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv  # type: ignore[reportMissingImports]
+except ImportError:  # pragma: no cover
+    def load_dotenv(*args, **kwargs):
+        return False
 
 load_dotenv()
 

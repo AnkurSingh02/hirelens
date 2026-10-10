@@ -1,6 +1,6 @@
 import time
 import hashlib
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException  # type: ignore[reportMissingImports]
 from typing import Optional
 import json
 

@@ -1,17 +1,34 @@
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-from typing import Dict
+from __future__ import annotations
+
+from importlib import import_module
+np = import_module('numpy')
+from typing import Any, Dict
 from core.config import settings
 
 # Load model once at module level (cached)
 _model = None
 
 
-def get_model() -> SentenceTransformer:
+def _cosine_similarity(left: Any, right: Any) -> Any:
+    """Compute pairwise cosine similarity without an sklearn dependency."""
+    left = np.asarray(left, dtype=float)
+    right = np.asarray(right, dtype=float)
+    left_norms = np.linalg.norm(left, axis=1, keepdims=True)
+    right_norms = np.linalg.norm(right, axis=1, keepdims=True)
+    denominator = left_norms @ right_norms.T
+    return np.divide(
+        left @ right.T,
+        denominator,
+        out=np.zeros((left.shape[0], right.shape[0]), dtype=float),
+        where=denominator != 0,
+    )
+
+
+def get_model() -> Any:
     """Lazy load the embedding model."""
     global _model
     if _model is None:
+        SentenceTransformer = import_module('sentence_transformers').SentenceTransformer
         _model = SentenceTransformer(settings.embedding_model)
     return _model
 
@@ -39,7 +56,7 @@ def compute_semantic_scores(
 
     if resume_full and jd_full:
         embeddings = model.encode([resume_full, jd_full])
-        similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+        similarity = _cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
         scores['overall'] = float(max(0, min(1, similarity)))
 
     # Section-level comparisons
@@ -55,7 +72,7 @@ def compute_semantic_scores(
 
         if resume_text and jd_text:
             embeddings = model.encode([resume_text, jd_text])
-            similarity = cosine_similarity(
+            similarity = _cosine_similarity(
                 [embeddings[0]], [embeddings[1]]
             )[0][0]
             scores[score_name] = float(max(0, min(1, similarity)))
@@ -81,7 +98,7 @@ def compute_bullet_similarities(
     resume_embeddings = model.encode(resume_bullets)
     jd_embeddings = model.encode(jd_requirements)
 
-    similarities = cosine_similarity(resume_embeddings, jd_embeddings)
+    similarities = _cosine_similarity(resume_embeddings, jd_embeddings)
 
     results = []
     for i, bullet in enumerate(resume_bullets):

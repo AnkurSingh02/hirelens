@@ -1,4 +1,8 @@
-from pydantic import BaseModel, Field
+try:
+    from pydantic import BaseModel, Field  # type: ignore[reportMissingImports]
+except ImportError:  # pragma: no cover - fallback for Pydantic v2 compatibility
+    from pydantic.v1 import BaseModel, Field  # type: ignore[reportMissingImports]
+
 from typing import List, Optional, Dict
 from datetime import datetime
 

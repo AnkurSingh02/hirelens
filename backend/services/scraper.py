@@ -1,7 +1,108 @@
-import requests
-from bs4 import BeautifulSoup
+from urllib.error import URLError
+from urllib.request import Request, urlopen
+from html.parser import HTMLParser
 import re
 from utils.text_cleaner import clean_text
+
+
+class _Element:
+    """Minimal HTML element supporting the operations used below."""
+
+    def __init__(self, tag: str = '', attrs=None):
+        self.tag = tag
+        self.attrs = dict(attrs or [])
+        self.children = []
+
+    def get_text(self, separator: str = '') -> str:
+        parts = []
+        for child in self.children:
+            if isinstance(child, str):
+                parts.append(child)
+            else:
+                text = child.get_text(separator)
+                if text:
+                    parts.append(text)
+        return separator.join(parts) if separator else ''.join(parts)
+
+    def decompose(self):
+        self.children.clear()
+
+    def _matches(self, selector: str) -> bool:
+        if selector.startswith('.'):
+            return selector[1:] in self.attrs.get('class', '').split()
+        if selector.startswith('#'):
+            return self.attrs.get('id') == selector[1:]
+        attr_match = re.fullmatch(r'\[([^*\]=]+)\*=["\']([^"\']+)["\']\]', selector)
+        if attr_match:
+            return attr_match.group(2) in self.attrs.get(attr_match.group(1), '')
+        return self.tag == selector
+
+    def find_all(self, tags):
+        if isinstance(tags, str):
+            tags = [tags]
+        found = []
+        for child in self.children:
+            if not isinstance(child, str):
+                if child.tag in tags:
+                    found.append(child)
+                found.extend(child.find_all(tags))
+        return found
+
+    def select_one(self, selector: str):
+        for child in self.children:
+            if not isinstance(child, str):
+                if child._matches(selector):
+                    return child
+                result = child.select_one(selector)
+                if result:
+                    return result
+        return None
+
+    def find(self, tag: str):
+        return self.select_one(tag)
+
+    def __call__(self, tags):
+        return self.find_all(tags)
+
+
+class _TreeParser(HTMLParser):
+    _void_tags = {
+        'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
+        'meta', 'param', 'source', 'track', 'wbr'
+    }
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.root = _Element('[document]')
+        self.stack = [self.root]
+
+    def handle_starttag(self, tag, attrs):
+        node = _Element(tag, attrs)
+        self.stack[-1].children.append(node)
+        if tag not in self._void_tags:
+            self.stack.append(node)
+
+    def handle_startendtag(self, tag, attrs):
+        self.stack[-1].children.append(_Element(tag, attrs))
+
+    def handle_endtag(self, tag):
+        for index in range(len(self.stack) - 1, 0, -1):
+            if self.stack[index].tag == tag:
+                del self.stack[index:]
+                break
+
+    def handle_data(self, data):
+        self.stack[-1].children.append(data)
+
+
+class BeautifulSoup(_Element):
+    """Standard-library replacement for the small subset of bs4 used here."""
+
+    def __init__(self, markup: str, parser: str = 'html.parser'):
+        super().__init__('[document]')
+        tree = _TreeParser()
+        tree.feed(markup)
+        self.children = tree.root.children
 
 
 def scrape_job_url(url: str) -> str:
@@ -19,15 +120,17 @@ def scrape_job_url(url: str) -> str:
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as e:
+        request = Request(url, headers=headers)
+        with urlopen(request, timeout=15) as response:
+            encoding = response.headers.get_content_charset() or 'utf-8'
+            html = response.read().decode(encoding, errors='replace')
+    except (URLError, TimeoutError, OSError, ValueError) as e:
         raise ValueError(
             f"Could not fetch URL: {str(e)}. "
             "Try pasting the job description text directly."
         )
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(html, 'html.parser')
 
     # Remove script and style elements
     for element in soup(['script', 'style', 'nav', 'footer', 'header']):
