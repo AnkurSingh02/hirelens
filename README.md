@@ -6,9 +6,9 @@
 
 **Paste a job description. Upload your resume. Get hired.**
 
-[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-hirelens.vercel.app-blue?style=for-the-badge)](hirelens-khaki.vercel.app)
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-hirelens-khaki.vercel.app-blue?style=for-the-badge)](hirelens-khaki.vercel.app)
 [![API Docs](https://img.shields.io/badge/📄_API_Docs-Swagger_UI-green?style=for-the-badge)](https://hirelens-api-f3mr.onrender.com/docs)
-[![Built With](https://img.shields.io/badge/Built_With-Llama_3.3_70B-purple?style=for-the-badge)](https://groq.com)
+[![Built With](https://img.shields.io/badge/Built_With-openai/gpt-oss-120b-purple?style=for-the-badge)](https://groq.com)
 [![Cost](https://img.shields.io/badge/Monthly_Cost-$0.00-brightgreen?style=for-the-badge)](#)
 
 <br/>
@@ -43,7 +43,7 @@ HireLens analyzes your resume against any job description in **30 seconds** and 
 
 ## ⚡ Live Demo
 
-**[→ Try it now at hirelens.vercel.app](hirelens-khaki.vercel.app)**
+**[→ Try it now at hirelens-khaki.vercel.app](hirelens-khaki.vercel.app)**
 
 No signup. No API keys. No credit card. Just paste and upload.
 
@@ -101,7 +101,7 @@ No signup. No API keys. No credit card. Just paste and upload.
 
 | Layer | Technology | Why | Cost |
 |-------|-----------|-----|------|
-| **LLM** | Groq (Llama 3.3 70B) | Fastest inference, 14K req/day free | $0 |
+| **LLM** | Groq (openai/gpt-oss-120b) | Fastest inference, 14K req/day free | $0 |
 | **Keywords** | YAKE | Lightweight, no ML dependencies | $0 |
 | **Backend** | Python + FastAPI | Async, fast, great DX | $0 |
 | **PDF Parsing** | pdfplumber + PyMuPDF | Handles complex layouts | $0 |
@@ -245,8 +245,8 @@ curl -X POST http://localhost:8000/api/analyze \
 
 | Service | Platform | URL |
 |---------|----------|-----|
-| Frontend | Vercel | [hirelens.vercel.app](hirelens-khaki.vercel.app) |
-| Backend | Render | [hirelens-api.onrender.com](https://hirelens-api-f3mr.onrender.com) |
+| Frontend | Vercel | [hirelens-khaki.vercel.app](hirelens-khaki.vercel.app) |
+| Backend | Render | [https://hirelens-api-f3mr.onrender.com](https://hirelens-api-f3mr.onrender.com) |
 | Database | Supabase | PostgreSQL (free tier) |
 
 Auto-deploys on every push to `main`.
