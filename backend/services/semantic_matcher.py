@@ -1,36 +1,19 @@
-from __future__ import annotations
+"""
+Semantic matching using Groq LLM instead of local embeddings.
+This eliminates the need for PyTorch/sentence-transformers entirely.
+"""
 
+import json
+import re
 from importlib import import_module
-np = import_module('numpy')
-from typing import Any, Dict
+from typing import Dict
 from core.config import settings
 
-# Load model once at module level (cached)
-_model = None
-
-
-def _cosine_similarity(left: Any, right: Any) -> Any:
-    """Compute pairwise cosine similarity without an sklearn dependency."""
-    left = np.asarray(left, dtype=float)
-    right = np.asarray(right, dtype=float)
-    left_norms = np.linalg.norm(left, axis=1, keepdims=True)
-    right_norms = np.linalg.norm(right, axis=1, keepdims=True)
-    denominator = left_norms @ right_norms.T
-    return np.divide(
-        left @ right.T,
-        denominator,
-        out=np.zeros((left.shape[0], right.shape[0]), dtype=float),
-        where=denominator != 0,
-    )
-
-
-def get_model() -> Any:
-    """Lazy load the embedding model."""
-    global _model
-    if _model is None:
-        SentenceTransformer = import_module('sentence_transformers').SentenceTransformer
-        _model = SentenceTransformer(settings.embedding_model)
-    return _model
+try:
+    Groq = getattr(import_module("groq"), "Groq")
+    client = Groq(api_key=settings.groq_api_key)
+except ImportError:
+    client = None
 
 
 def compute_semantic_scores(
@@ -38,48 +21,75 @@ def compute_semantic_scores(
     jd_sections: Dict[str, str]
 ) -> Dict[str, float]:
     """
-    Compute semantic similarity between resume and JD sections.
-
-    Args:
-        resume_sections: Dict of section_name -> text
-        jd_sections: Dict of section_name -> text
-
-    Returns:
-        Dict of section_name -> similarity_score (0-1)
+    Use LLM to estimate semantic similarity between resume and JD sections.
+    Returns scores between 0.0 and 1.0.
     """
-    model = get_model()
-    scores = {}
+    resume_text = ' '.join(
+        v for v in resume_sections.values() if v
+    )[:2000]
+    jd_text = ' '.join(
+        v for v in jd_sections.values() if v
+    )[:2000]
 
-    # Overall similarity
-    resume_full = ' '.join(resume_sections.values())
-    jd_full = ' '.join(jd_sections.values())
+    if not resume_text or not jd_text:
+        return {
+            'overall': 0.5,
+            'skills': 0.5,
+            'experience': 0.5,
+            'education': 0.5,
+        }
 
-    if resume_full and jd_full:
-        embeddings = model.encode([resume_full, jd_full])
-        similarity = _cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-        scores['overall'] = float(max(0, min(1, similarity)))
+    prompt = f"""You are an expert recruiter. Rate the semantic similarity between this resume and job description on a scale of 0.0 to 1.0.
 
-    # Section-level comparisons
-    section_mappings = [
-        ('skills', 'skills_required', 'skills'),
-        ('experience', 'responsibilities', 'experience'),
-        ('education', 'education_required', 'education'),
-    ]
+RESUME EXCERPT:
+{resume_text}
 
-    for resume_key, jd_key, score_name in section_mappings:
-        resume_text = resume_sections.get(resume_key, '')
-        jd_text = jd_sections.get(jd_key, '')
+JOB DESCRIPTION EXCERPT:
+{jd_text}
 
-        if resume_text and jd_text:
-            embeddings = model.encode([resume_text, jd_text])
-            similarity = _cosine_similarity(
-                [embeddings[0]], [embeddings[1]]
-            )[0][0]
-            scores[score_name] = float(max(0, min(1, similarity)))
-        else:
-            scores[score_name] = 0.0
+Return ONLY a JSON object with these exact keys and float values between 0.0 and 1.0:
+{{"overall": 0.0, "skills": 0.0, "experience": 0.0, "education": 0.0}}
 
-    return scores
+Rules:
+- 0.9-1.0 = near perfect match
+- 0.7-0.89 = strong match
+- 0.5-0.69 = moderate match
+- 0.3-0.49 = weak match
+- 0.0-0.29 = no match
+- Be realistic, not generous"""
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.llm_model,
+            messages=[
+                {"role": "system", "content": "Return only valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=200
+        )
+
+        text = response.choices[0].message.content.strip()
+        text = re.sub(r'```json\s*', '', text)
+        text = re.sub(r'```\s*', '', text)
+
+        data = json.loads(text)
+
+        return {
+            'overall': float(data.get('overall', 0.5)),
+            'skills': float(data.get('skills', 0.5)),
+            'experience': float(data.get('experience', 0.5)),
+            'education': float(data.get('education', 0.5)),
+        }
+
+    except Exception as e:
+        print(f"⚠️ Semantic scoring fallback: {e}")
+        return {
+            'overall': 0.5,
+            'skills': 0.5,
+            'experience': 0.5,
+            'education': 0.5,
+        }
 
 
 def compute_bullet_similarities(
@@ -87,28 +97,33 @@ def compute_bullet_similarities(
     jd_requirements: list
 ) -> list:
     """
-    Find which resume bullets best match which JD requirements.
-    Returns list of (resume_bullet, best_matching_requirement, similarity).
+    Simplified bullet matching without local embeddings.
+    Returns basic pairing based on order and keyword overlap.
     """
     if not resume_bullets or not jd_requirements:
         return []
 
-    model = get_model()
-
-    resume_embeddings = model.encode(resume_bullets)
-    jd_embeddings = model.encode(jd_requirements)
-
-    similarities = _cosine_similarity(resume_embeddings, jd_embeddings)
-
     results = []
-    for i, bullet in enumerate(resume_bullets):
-        best_match_idx = np.argmax(similarities[i])
-        best_score = similarities[i][best_match_idx]
+    for bullet in resume_bullets:
+        # Simple keyword overlap scoring
+        bullet_words = set(bullet.lower().split())
+        best_score = 0
+        best_match = jd_requirements[0]
+
+        for req in jd_requirements:
+            req_words = set(req.lower().split())
+            overlap = len(bullet_words & req_words)
+            total = len(bullet_words | req_words)
+            score = overlap / total if total > 0 else 0
+
+            if score > best_score:
+                best_score = score
+                best_match = req
 
         results.append({
             'resume_bullet': bullet,
-            'matched_requirement': jd_requirements[best_match_idx],
-            'similarity': float(best_score)
+            'matched_requirement': best_match,
+            'similarity': min(best_score * 2, 1.0)  # Scale up slightly
         })
 
     return results

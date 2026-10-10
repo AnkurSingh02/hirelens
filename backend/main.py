@@ -15,14 +15,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@app.on_event("startup")
-async def startup_event():
-    """Pre-load ML model so first request isn't slow."""
-    print("🔄 Pre-loading embedding model...")
-    from services.semantic_matcher import get_model
-    get_model()
-    print("✅ Model loaded and ready")
-
 # Add rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
